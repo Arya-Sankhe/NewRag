@@ -1,4 +1,5 @@
 import os
+import json
 import glob
 import config
 from pathlib import Path
@@ -38,9 +39,23 @@ class DocumentChuncker:
         split_parents = self.__split_large_parents(merged_parents)
         cleaned_parents = self.__clean_small_chunks(split_parents)
         
+        # Load images metadata if available
+        images_metadata = self._load_images_metadata(doc_path)
+        
         all_parent_chunks, all_child_chunks = [], []
-        self.__create_child_chunks(all_parent_chunks, all_child_chunks, cleaned_parents, doc_path)
+        self.__create_child_chunks(all_parent_chunks, all_child_chunks, cleaned_parents, doc_path, images_metadata)
         return all_parent_chunks, all_child_chunks
+    
+    def _load_images_metadata(self, md_path: Path) -> list:
+        """Load images metadata from JSON file if it exists."""
+        images_json_path = md_path.parent / f"{md_path.stem}_images.json"
+        if images_json_path.exists():
+            try:
+                with open(images_json_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"⚠️ Could not load images metadata: {e}")
+        return []
 
     def __merge_small_parents(self, chunks):
         if not chunks:
@@ -118,10 +133,70 @@ class DocumentChuncker:
         
         return cleaned
 
-    def __create_child_chunks(self, all_parent_pairs, all_child_chunks, parent_chunks, doc_path):
+    def __create_child_chunks(self, all_parent_pairs, all_child_chunks, parent_chunks, doc_path, images_metadata=None):
+        """
+        Create child chunks from parent chunks and link images.
+        
+        Args:
+            all_parent_pairs: List to append (parent_id, parent_chunk) tuples
+            all_child_chunks: List to append child chunk documents
+            parent_chunks: List of parent chunk documents
+            doc_path: Path to source document
+            images_metadata: List of image metadata dicts from Docling
+        """
+        images_metadata = images_metadata or []
+        
         for i, p_chunk in enumerate(parent_chunks):
             parent_id = f"{doc_path.stem}_parent_{i}"
-            p_chunk.metadata.update({"source": str(doc_path.stem)+".pdf", "parent_id": parent_id})
+            p_chunk.metadata.update({
+                "source": str(doc_path.stem) + ".pdf", 
+                "parent_id": parent_id
+            })
+            
+            # Link images to this parent chunk
+            # Strategy: Associate images with chunks based on order or page number
+            if images_metadata:
+                # Try to get page numbers from images
+                chunk_images = self._get_images_for_chunk(i, len(parent_chunks), images_metadata)
+                if chunk_images:
+                    p_chunk.metadata["ocr_images"] = chunk_images
             
             all_parent_pairs.append((parent_id, p_chunk))
             all_child_chunks.extend(self.__child_splitter.split_documents([p_chunk]))
+    
+    def _get_images_for_chunk(self, chunk_index: int, total_chunks: int, images_metadata: list) -> list:
+        """
+        Get images that should be associated with a particular chunk.
+        
+        Uses a distribution strategy based on page numbers if available,
+        otherwise distributes images evenly across chunks.
+        """
+        if not images_metadata:
+            return []
+        
+        # Collect page numbers from images
+        page_numbers = set()
+        for img in images_metadata:
+            if img.get("page_number") is not None:
+                page_numbers.add(img["page_number"])
+        
+        if page_numbers:
+            # If images have page numbers, use page-based distribution
+            # Estimate which pages this chunk covers
+            max_page = max(page_numbers)
+            pages_per_chunk = max(1, max_page / total_chunks)
+            chunk_start_page = int(chunk_index * pages_per_chunk) + 1
+            chunk_end_page = int((chunk_index + 1) * pages_per_chunk) + 1
+            
+            chunk_images = [
+                img for img in images_metadata
+                if img.get("page_number") is not None 
+                and chunk_start_page <= img["page_number"] <= chunk_end_page
+            ]
+            return chunk_images
+        else:
+            # Distribute images evenly if no page numbers
+            images_per_chunk = max(1, len(images_metadata) // total_chunks)
+            start_idx = chunk_index * images_per_chunk
+            end_idx = start_idx + images_per_chunk if chunk_index < total_chunks - 1 else len(images_metadata)
+            return images_metadata[start_idx:end_idx]

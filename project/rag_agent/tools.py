@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from langchain_core.tools import tool
 from db.parent_store_manager import ParentStoreManager
 
@@ -34,11 +34,55 @@ class ToolFactory:
     
         Args:
             parent_ids: List of parent chunk IDs to retrieve
+            
+        Returns:
+            List of parent chunk dicts with content, metadata, and images
         """
-        return self.parent_store_manager.load_many(parent_ids)
+        results = self.parent_store_manager.load_many(parent_ids)
+        
+        # Format images for display
+        for result in results:
+            ocr_images = result.get("metadata", {}).get("ocr_images", [])
+            if ocr_images:
+                result["images"] = self._format_images_for_display(ocr_images)
+        
+        return results
+    
+    def _format_images_for_display(self, images: List[Dict]) -> List[Dict]:
+        """
+        Format images with proper data URLs for display.
+        
+        Args:
+            images: List of image metadata dicts with base64_data
+            
+        Returns:
+            List of formatted image dicts with data_url
+        """
+        formatted = []
+        for img in images:
+            base64_data = img.get("base64_data", "")
+            if not base64_data:
+                continue
+            
+            mime_type = img.get("mime_type", "image/png")
+            
+            # Ensure no duplicate data: prefix
+            if base64_data.startswith("data:"):
+                data_url = base64_data
+            else:
+                data_url = f"data:{mime_type};base64,{base64_data}"
+            
+            formatted.append({
+                "image_id": img.get("image_id", ""),
+                "data_url": data_url,
+                "caption": img.get("caption", "") or img.get("description", ""),
+                "page_number": img.get("page_number")
+            })
+        
+        return formatted
     
     def create_tools(self) -> List:
-        """Crea e restituisce la lista di tools."""
+        """Create and return the list of tools."""
         search_tool = tool("search_child_chunks")(self._search_child_chunks)
         retrieve_tool = tool("retrieve_parent_chunks")(self._retrieve_parent_chunks)
         

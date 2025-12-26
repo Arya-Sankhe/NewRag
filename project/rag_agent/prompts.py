@@ -64,6 +64,12 @@ def get_rag_agent_prompt() -> str:
         4. Stop retrieval as soon as information is sufficient.
         5. Answer using ONLY retrieved information.
         6. List file name at the end.
+        
+        Image handling:
+        - Retrieved content may include images with captions and descriptions.
+        - If images are relevant to the answer, mention them naturally.
+        - Reference images by their captions or page numbers when available.
+        - Images will be automatically displayed to the user.
 
         Retry rule:
         - If no relevant information is found, rewrite the query into a concise,

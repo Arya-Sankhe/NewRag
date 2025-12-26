@@ -1,7 +1,7 @@
 from pathlib import Path
 import shutil
 import config
-from util import pdfs_to_markdowns
+from util import pdf_to_markdown
 
 class DocumentManager:
 
@@ -38,7 +38,9 @@ class DocumentManager:
                 if Path(doc_path).suffix.lower() == ".md":
                     shutil.copy(doc_path, md_path)
                 else:
-                    pdfs_to_markdowns(str(doc_path), overwrite=False)            
+                    # Use pdf_to_markdown which now handles Docling and image extraction
+                    pdf_to_markdown(str(doc_path), str(self.markdown_dir))
+                    
                 parent_chunks, child_chunks = self.rag_system.chunker.create_chunks_single(md_path)
                 
                 if not child_chunks:

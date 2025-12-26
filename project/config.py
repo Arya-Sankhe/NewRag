@@ -16,8 +16,8 @@ SPARSE_MODEL = "Qdrant/bm25"
 USE_OPENAI = True
 
 # OpenAI Configuration
-OPENAI_API_KEY = ""  # Set your API key here or use environment variable
-OPENAI_MODEL = "gpt-4o-mini"  # Options: gpt-4o-mini, gpt-4o, gpt-4-turbo
+OPENAI_API_KEY = "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"  # Set your API key here or use environment variable
+OPENAI_MODEL = "gpt-5-mini"  # Options: gpt-4o-mini, gpt-4o, gpt-4-turbo
 
 # Ollama Configuration (local, heavier but free)
 OLLAMA_MODEL = "qwen3:4b-instruct-2507-q4_K_M"

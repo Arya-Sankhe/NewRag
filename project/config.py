@@ -7,22 +7,17 @@ QDRANT_DB_PATH = "qdrant_db"
 CHILD_COLLECTION = "document_child_chunks"
 SPARSE_VECTOR_NAME = "sparse"
 
-# --- Model Configuration ---
-DENSE_MODEL = "sentence-transformers/all-mpnet-base-v2"
-SPARSE_MODEL = "Qdrant/bm25"
+# --- OpenAI Configuration (All-in-One) ---
+# Get your API key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY = ""  # <-- PUT YOUR VALID API KEY HERE
 
-# --- LLM Provider Configuration ---
-# Set USE_OPENAI = True to use OpenAI, False for Ollama (local)
-USE_OPENAI = True
+# LLM Model for queries
+OPENAI_LLM_MODEL = "gpt-4o-mini"  # Options: gpt-4o-mini, gpt-4o, gpt-4-turbo
 
-# OpenAI Configuration
-OPENAI_API_KEY = "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"  # Set your API key here or use environment variable
-OPENAI_MODEL = "gpt-5-mini"  # Options: gpt-4o-mini, gpt-4o, gpt-4-turbo
+# Embedding model for document indexing
+OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"  # Options: text-embedding-3-small, text-embedding-3-large
 
-# Ollama Configuration (local, heavier but free)
-OLLAMA_MODEL = "qwen3:4b-instruct-2507-q4_K_M"
-
-# Shared LLM settings  
+# Temperature for responses (0 = deterministic, 1 = creative)
 LLM_TEMPERATURE = 0
 
 # --- Text Splitter Configuration ---
@@ -36,8 +31,9 @@ HEADERS_TO_SPLIT_ON = [
     ("###", "H3")
 ]
 
-# --- Docling Parser Configuration ---
+# --- PDF Parser Configuration ---
+# Docling for advanced OCR and image extraction
 ENABLE_DOCLING = True
 DOCLING_OCR_ENABLED = True
 DOCLING_IMAGE_SCALE = 2.0
-DOCLING_GENERATE_CAPTIONS = False  # Requires VLM model, set True if available
+DOCLING_GENERATE_CAPTIONS = False

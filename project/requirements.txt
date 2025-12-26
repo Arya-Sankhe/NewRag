@@ -1,12 +1,12 @@
-# Core dependencies with flexible versions for Docling compatibility
-# Docling requires PyTorch 2.2-2.5 and NumPy 1.x for best compatibility
+# OpenAI + Docling RAG System Dependencies
 
-# --- LangChain ecosystem ---
+# --- OpenAI ---
+openai>=1.0.0
+langchain-openai>=0.1.0
+
+# --- LangChain Core ---
 langchain>=0.2.0,<0.3.0
 langchain-core>=0.2.0,<0.3.0
-langchain-huggingface>=0.0.3
-langchain-ollama>=0.1.0
-langchain-openai>=0.1.0
 langchain-qdrant>=0.1.0
 langchain-text-splitters>=0.2.0
 langgraph>=0.1.0
@@ -16,28 +16,19 @@ langsmith>=0.1.0
 # --- Vector DB ---
 qdrant-client>=1.9.0
 
-# --- Embeddings ---
-sentence-transformers>=2.2.0
-fastembed>=0.2.0
-
 # --- PDF Processing ---
 PyMuPDF>=1.23.0
 pymupdf4llm>=0.0.5
 
-# --- Docling OCR (requires compatible PyTorch) ---
+# --- Docling OCR (for advanced PDF parsing) ---
 docling>=2.0.0
 docling-core>=2.0.0
 
-# --- PyTorch (Docling compatible) ---
-# Install PyTorch separately based on your system:
-# CPU: pip install torch>=2.2.0,<2.6.0
-# GPU: pip install torch>=2.2.0,<2.6.0 --index-url https://download.pytorch.org/whl/cu118
+# --- PyTorch (required by Docling) ---
+# Note: On Linux, you may need: apt-get install libgl1-mesa-glx
 torch>=2.2.0,<2.6.0
 
-# --- NumPy (Docling models need 1.x) ---
-numpy>=1.24.0,<2.0.0
-
-# --- Web framework ---
+# --- Web Framework ---
 gradio>=4.0.0
 fastapi>=0.100.0
 uvicorn>=0.23.0
@@ -49,16 +40,10 @@ requests>=2.31.0
 python-multipart>=0.0.6
 aiofiles>=23.0.0
 tqdm>=4.65.0
-
-# --- ML/Data ---
-transformers>=4.35.0
-huggingface-hub>=0.20.0
-scikit-learn>=1.3.0
-pandas>=2.0.0
-scipy>=1.11.0
-
-# --- Other ---
 pyyaml>=6.0
 rich>=13.0.0
 tenacity>=8.2.0
-protobuf>=4.0.0
+
+# --- Data Processing ---
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0

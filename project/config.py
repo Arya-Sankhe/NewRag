@@ -1,3 +1,9 @@
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 # --- Directory Configuration ---
 MARKDOWN_DIR = "markdown_docs"
 PARENT_STORE_PATH = "parent_store"
@@ -7,9 +13,9 @@ QDRANT_DB_PATH = "qdrant_db"
 CHILD_COLLECTION = "document_child_chunks"
 SPARSE_VECTOR_NAME = "sparse"
 
-# --- OpenAI Configuration (All-in-One) ---
-# Get your API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY = ""  # <-- PUT YOUR VALID API KEY HERE
+# --- OpenAI Configuration ---
+# API key loaded from .env file (OPENAI_API_KEY=sk-...)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 # LLM Model for queries
 OPENAI_LLM_MODEL = "gpt-4o-mini"  # Options: gpt-4o-mini, gpt-4o, gpt-4-turbo

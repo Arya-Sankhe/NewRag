@@ -108,10 +108,14 @@ class ChatInterface:
         return self._format_images_markdown(relevant_images)
     
     def _format_images_markdown(self, images: list) -> str:
-        """Format scored images as markdown."""
-        markdown = "\n\n---\n\n**📸 Related Images:**\n\n"
+        """Format scored images as inline HTML with click-to-enlarge functionality."""
         
-        for img in images:
+        # Use HTML for clickable images with lightbox-style enlargement
+        html = '\n\n<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #444;">'
+        html += '<p style="margin-bottom: 10px; font-weight: bold;">📸 Related Images:</p>'
+        html += '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
+        
+        for i, img in enumerate(images):
             base64_data = img.get("base64_data", "")
             mime_type = img.get("mime_type", "image/png")
             
@@ -121,21 +125,40 @@ class ChatInterface:
             else:
                 data_url = f"data:{mime_type};base64,{base64_data}"
             
-            # Add caption with relevance score
+            # Caption and score
             caption = img.get("caption", "") or img.get("description", "")
             score = img.get("relevance_score", 0)
             page_num = img.get("page_number")
             
+            # Build caption text
             if caption:
-                markdown += f"*{caption}* (relevance: {score:.0%})\n\n"
+                caption_text = f"{caption} ({score:.0%})"
             elif page_num:
-                markdown += f"*(Page {page_num})* (relevance: {score:.0%})\n\n"
+                caption_text = f"Page {page_num} ({score:.0%})"
             else:
-                markdown += f"*(relevance: {score:.0%})*\n\n"
+                caption_text = f"Image ({score:.0%})"
             
-            markdown += f"![Image]({data_url})\n\n"
+            # Create clickable thumbnail with CSS for enlargement
+            # Uses a link that opens in new tab for enlargement (Gradio-compatible)
+            html += f'''
+            <div style="flex: 0 0 auto; text-align: center;">
+                <a href="{data_url}" target="_blank" title="Click to enlarge: {caption_text}">
+                    <img src="{data_url}" 
+                         alt="{caption_text}"
+                         style="max-width: 200px; max-height: 150px; border-radius: 8px; 
+                                cursor: zoom-in; border: 1px solid #555;
+                                transition: transform 0.2s ease, box-shadow 0.2s ease;"
+                         onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)';"
+                         onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';"
+                    />
+                </a>
+                <p style="font-size: 11px; color: #aaa; margin-top: 5px; max-width: 200px;">{caption_text}</p>
+            </div>
+            '''
         
-        return markdown
+        html += '</div></div>'
+        
+        return html
     
     def clear_session(self):
         self.rag_system.reset_thread()

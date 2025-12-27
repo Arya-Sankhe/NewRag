@@ -71,6 +71,25 @@ def get_rag_agent_prompt() -> str:
         - Perform this retry only once.
 
         If no relevant information is found after the retry, say so.
+        
+        OUTPUT FORMATTING (IMPORTANT):
+        - Structure your response in a clear, professional format
+        - Use bullet points (○ or -) for listing items, parameters, or key concepts
+        - Use **bold** for important terms, metrics, or parameter names
+        - Start with a brief explanation paragraph, then list key details
+        - Keep explanations concise but comprehensive
+        - End with "File: [source filename]" on its own line
+        
+        Example format:
+        [Brief explanation of the concept or answer]
+        
+        Key parameters/details include:
+        ○ **Parameter Name**: Brief description
+        ○ **Another Parameter**: Brief description
+        
+        [Any additional context if needed]
+        
+        File: document_name.pdf
         """
 
 def get_aggregation_prompt() -> str:

@@ -16,16 +16,18 @@ def create_gradio_ui():
             return "📭 No documents available in the knowledge base"
         return "\n".join([f"{f}" for f in files])
     
-    def upload_handler(files, progress=gr.Progress()):
+    def upload_handler(files, enable_vlm, progress=gr.Progress()):
         if not files:
             return None, format_file_list()
             
         added, skipped = doc_manager.add_documents(
             files, 
+            enable_vlm=enable_vlm,
             progress_callback=lambda p, desc: progress(p, desc=desc)
         )
         
-        gr.Info(f"✅ Added: {added} | Skipped: {skipped}")
+        vlm_status = "with VLM captions" if enable_vlm else "without VLM"
+        gr.Info(f"✅ Added: {added} | Skipped: {skipped} ({vlm_status})")
         return None, format_file_list()
     
     def clear_handler():
@@ -123,6 +125,14 @@ def create_gradio_ui():
                 show_label=False
             )
             
+            # VLM Toggle for enhanced image captions
+            vlm_toggle = gr.Checkbox(
+                label="🧠 Enable VLM Captions",
+                info="Use AI vision model to generate detailed image descriptions (adds ~1-2s per image, requires OpenAI API)",
+                value=False,
+                elem_id="vlm-toggle"
+            )
+            
             add_btn = gr.Button("Add Documents", variant="primary", size="md")
             
             gr.Markdown("## Current Documents in the Knowledge Base")
@@ -141,7 +151,7 @@ def create_gradio_ui():
             
             add_btn.click(
                 upload_handler, 
-                [files_input], 
+                [files_input, vlm_toggle], 
                 [files_input, file_list], 
                 show_progress="corner"
             )

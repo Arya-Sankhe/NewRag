@@ -8,15 +8,16 @@ from typing import Tuple, List, Dict
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-def pdf_to_markdown(pdf_path: str, output_dir: str) -> Tuple[Path, List[Dict]]:
+def pdf_to_markdown(pdf_path: str, output_dir: str, enable_vlm: bool = False) -> Tuple[Path, List[Dict]]:
     """
-    Convert PDF to markdown with optional image extraction.
+    Convert PDF to markdown with optional image extraction and VLM captions.
     
     Uses Docling if enabled in config, otherwise falls back to PyMuPDF.
     
     Args:
         pdf_path: Path to PDF file
         output_dir: Directory to save markdown file
+        enable_vlm: If True, use VLM for enhanced image captions
         
     Returns:
         Tuple of (markdown_path, images_metadata)
@@ -40,6 +41,10 @@ def pdf_to_markdown(pdf_path: str, output_dir: str) -> Tuple[Path, List[Dict]]:
             
             markdown_text, images_metadata = parser.convert(pdf_path)
             md_path.write_text(markdown_text, encoding='utf-8')
+            
+            # Generate VLM captions if enabled
+            if enable_vlm and images_metadata:
+                images_metadata = _add_vlm_captions(images_metadata)
             
             # Save images metadata as JSON
             if images_metadata:
@@ -72,6 +77,74 @@ def pdf_to_markdown(pdf_path: str, output_dir: str) -> Tuple[Path, List[Dict]]:
     md_path.write_bytes(md_cleaned.encode('utf-8'))
     
     return md_path, []
+
+
+def _add_vlm_captions(images_metadata: List[Dict]) -> List[Dict]:
+    """
+    Add VLM-generated captions to images using OpenAI's vision model.
+    
+    Args:
+        images_metadata: List of image metadata dicts with base64_data
+        
+    Returns:
+        Updated images_metadata with vlm_caption field
+    """
+    try:
+        from langchain_openai import ChatOpenAI
+        from langchain_core.messages import HumanMessage
+        
+        # Use GPT-4o-mini for cost-effective vision
+        vlm = ChatOpenAI(model="gpt-4o-mini", max_tokens=150)
+        
+        print(f"   🧠 Generating VLM captions for {len(images_metadata)} images...")
+        
+        for i, img in enumerate(images_metadata):
+            base64_data = img.get("base64_data", "")
+            if not base64_data:
+                continue
+            
+            mime_type = img.get("mime_type", "image/png")
+            
+            # Build data URL
+            if base64_data.startswith("data:"):
+                image_url = base64_data
+            else:
+                image_url = f"data:{mime_type};base64,{base64_data}"
+            
+            try:
+                # Create vision message
+                message = HumanMessage(
+                    content=[
+                        {
+                            "type": "text",
+                            "text": "Describe this image in 1-2 sentences. Focus on what the image shows (charts, diagrams, photos, etc.) and any key information visible. Be concise."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": image_url}
+                        }
+                    ]
+                )
+                
+                response = vlm.invoke([message])
+                vlm_caption = response.content.strip()
+                
+                img["vlm_caption"] = vlm_caption
+                print(f"      ✓ Image {i+1}: {vlm_caption[:50]}...")
+                
+            except Exception as e:
+                print(f"      ⚠️ VLM failed for image {i+1}: {e}")
+                img["vlm_caption"] = ""
+        
+        print(f"   ✓ VLM captions complete")
+        return images_metadata
+        
+    except ImportError as e:
+        print(f"   ⚠️ VLM not available (langchain_openai not installed): {e}")
+        return images_metadata
+    except Exception as e:
+        print(f"   ⚠️ VLM caption generation failed: {e}")
+        return images_metadata
 
 
 def pdfs_to_markdowns(path_pattern: str, overwrite: bool = False) -> Tuple[int, int]:

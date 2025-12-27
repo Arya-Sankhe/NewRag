@@ -47,17 +47,46 @@ class ToolFactory:
             parent_ids: List of parent chunk IDs to retrieve
             
         Returns:
-            List of parent chunk dicts with content, metadata, and images
+            List of parent chunk dicts with content and image references (NOT base64 data)
         """
         results = self.parent_store_manager.load_many(parent_ids)
         
-        # Format images for display
+        # Process results - DON'T include base64 data in LLM context!
+        processed_results = []
         for result in results:
+            # Get image metadata WITHOUT base64 data (just captions/references)
             ocr_images = result.get("metadata", {}).get("ocr_images", [])
+            image_refs = []
             if ocr_images:
-                result["images"] = self._format_images_for_display(ocr_images)
+                for img in ocr_images:
+                    # Only include text descriptions, NOT base64 data
+                    image_refs.append({
+                        "image_id": img.get("image_id", ""),
+                        "caption": img.get("caption", "") or img.get("description", ""),
+                        "page_number": img.get("page_number")
+                    })
+            
+            # Build a clean result without huge base64 strings
+            clean_result = {
+                "content": result.get("content", ""),
+                "parent_id": result.get("parent_id", ""),
+                "source": result.get("metadata", {}).get("source", ""),
+            }
+            
+            # Add image references as text (for LLM context)
+            if image_refs:
+                image_summary = f"\n[This section contains {len(image_refs)} image(s):"
+                for ref in image_refs:
+                    if ref.get("caption"):
+                        image_summary += f" '{ref['caption']}'"
+                    elif ref.get("page_number"):
+                        image_summary += f" (page {ref['page_number']})"
+                image_summary += "]"
+                clean_result["content"] += image_summary
+            
+            processed_results.append(clean_result)
         
-        return results
+        return processed_results
     
     def _format_images_for_display(self, images: List[Dict]) -> List[Dict]:
         """

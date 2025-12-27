@@ -108,14 +108,12 @@ class ChatInterface:
         return self._format_images_markdown(relevant_images)
     
     def _format_images_markdown(self, images: list) -> str:
-        """Format scored images as inline HTML with click-to-enlarge functionality."""
+        """Format scored images as markdown (Gradio ChatInterface renders markdown, not raw HTML)."""
         
-        # Use HTML for clickable images with lightbox-style enlargement
-        html = '\n\n<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #444;">'
-        html += '<p style="margin-bottom: 10px; font-weight: bold;">📸 Related Images:</p>'
-        html += '<div style="display: flex; flex-wrap: wrap; gap: 10px;">'
+        # Use markdown format - Gradio ChatInterface properly renders this
+        markdown = "\n\n---\n\n**📸 Related Images:**\n\n"
         
-        for i, img in enumerate(images):
+        for img in images:
             base64_data = img.get("base64_data", "")
             mime_type = img.get("mime_type", "image/png")
             
@@ -126,39 +124,22 @@ class ChatInterface:
                 data_url = f"data:{mime_type};base64,{base64_data}"
             
             # Caption and score
-            caption = img.get("caption", "") or img.get("description", "")
+            caption = img.get("caption", "") or img.get("vlm_caption", "") or img.get("description", "")
             score = img.get("relevance_score", 0)
             page_num = img.get("page_number")
             
             # Build caption text
             if caption:
-                caption_text = f"{caption} ({score:.0%})"
+                caption_text = f"*{caption}* ({score:.0%})"
             elif page_num:
-                caption_text = f"Page {page_num} ({score:.0%})"
+                caption_text = f"*Page {page_num}* ({score:.0%})"
             else:
-                caption_text = f"Image ({score:.0%})"
+                caption_text = f"({score:.0%})"
             
-            # Create clickable thumbnail with CSS for enlargement
-            # Uses a link that opens in new tab for enlargement (Gradio-compatible)
-            html += f'''
-            <div style="flex: 0 0 auto; text-align: center;">
-                <a href="{data_url}" target="_blank" title="Click to enlarge: {caption_text}">
-                    <img src="{data_url}" 
-                         alt="{caption_text}"
-                         style="max-width: 200px; max-height: 150px; border-radius: 8px; 
-                                cursor: zoom-in; border: 1px solid #555;
-                                transition: transform 0.2s ease, box-shadow 0.2s ease;"
-                         onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)';"
-                         onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';"
-                    />
-                </a>
-                <p style="font-size: 11px; color: #aaa; margin-top: 5px; max-width: 200px;">{caption_text}</p>
-            </div>
-            '''
+            markdown += f"{caption_text}\n\n"
+            markdown += f"![Image]({data_url})\n\n"
         
-        html += '</div></div>'
-        
-        return html
+        return markdown
     
     def clear_session(self):
         self.rag_system.reset_thread()

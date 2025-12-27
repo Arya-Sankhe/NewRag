@@ -16,7 +16,16 @@ class ToolFactory:
             k: Number of results to return
         """
         try:
-            results = self.collection.similarity_search(query, k=k, score_threshold=0.7)
+            # Note: Removed score_threshold as it was filtering out valid results
+            # OpenAI embeddings cosine similarity often returns scores < 0.7
+            results = self.collection.similarity_search(query, k=k)
+            
+            print(f"🔍 Search query: '{query}' → Found {len(results)} results")
+            
+            if not results:
+                print("   ⚠️ No results found - check if documents are indexed")
+                return []
+            
             return [
                 {
                     "content": doc.page_content,
@@ -26,7 +35,9 @@ class ToolFactory:
                 for doc in results
             ]
         except Exception as e:
-            print(f"Error searching child chunks: {e}")
+            print(f"❌ Error searching child chunks: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def _retrieve_parent_chunks(self, parent_ids: List[str]) -> List[dict]:

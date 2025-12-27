@@ -1,6 +1,7 @@
 from typing import List, Dict
 from langchain_core.tools import tool
 from db.parent_store_manager import ParentStoreManager
+from core.chat_interface import image_tracker
 
 class ToolFactory:
     
@@ -50,6 +51,11 @@ class ToolFactory:
             List of parent chunk dicts with content and image references (NOT base64 data)
         """
         results = self.parent_store_manager.load_many(parent_ids)
+        
+        # Track parent IDs for post-response image injection
+        for parent_id in parent_ids:
+            image_tracker.track(parent_id)
+            print(f"📷 Tracked parent_id for images: {parent_id}")
         
         # Process results - DON'T include base64 data in LLM context!
         processed_results = []

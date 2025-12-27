@@ -130,6 +130,7 @@ def create_gradio_ui():
                 label="🧠 Enable VLM Captions",
                 info="Use AI vision model to generate detailed image descriptions (adds ~1-2s per image, requires OpenAI API)",
                 value=False,
+                interactive=True,
                 elem_id="vlm-toggle"
             )
             

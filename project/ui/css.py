@@ -271,4 +271,42 @@ custom_css = """
     footer {
         visibility: hidden;
     }
+    
+    /* ============================================
+       CHECKBOX - VLM TOGGLE
+       ============================================ */
+    #vlm-toggle {
+        background: #1a1a1a !important;
+        border: 1px solid #3f3f3f !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        margin: 10px 0 !important;
+    }
+    
+    #vlm-toggle label {
+        cursor: pointer !important;
+        color: #e5e5e5 !important;
+    }
+    
+    #vlm-toggle input[type="checkbox"] {
+        width: 18px !important;
+        height: 18px !important;
+        cursor: pointer !important;
+        accent-color: #3b82f6 !important;
+        pointer-events: auto !important;
+    }
+    
+    #vlm-toggle .wrap {
+        pointer-events: auto !important;
+    }
+    
+    #vlm-toggle:hover {
+        border-color: #3b82f6 !important;
+    }
+    
+    /* Ensure checkbox container is clickable */
+    .checkbox-group,
+    [data-testid="checkbox"] {
+        pointer-events: auto !important;
+    }
 """

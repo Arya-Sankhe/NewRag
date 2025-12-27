@@ -28,6 +28,9 @@ docling-core>=2.0.0
 # Note: On Linux, you may need: apt-get install libgl1-mesa-glx
 torch>=2.2.0,<2.6.0
 
+# --- OpenCLIP (for semantic image-query matching) ---
+open-clip-torch>=2.24.0
+
 # --- Web Framework ---
 gradio>=4.0.0
 fastapi>=0.100.0

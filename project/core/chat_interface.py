@@ -1,6 +1,7 @@
-import re
 from langchain_core.messages import HumanMessage
 from db.parent_store_manager import ParentStoreManager
+from rag_agent.image_scorer import score_images_for_query
+import config
 
 
 class ImageTracker:
@@ -49,19 +50,10 @@ class ChatInterface:
             # Get LLM response
             response_text = result["messages"][-1].content
             
-            # Parse [SHOW_IMAGES: id1, id2] tag from response
-            selected_image_ids = self._parse_show_images_tag(response_text)
-            
-            # Remove the tag from visible response
-            response_text = self._remove_show_images_tag(response_text)
-            
-            # Get images for selected IDs only (or all if no tag found)
+            # Get images from retrieved chunks and score with CLIP
             retrieved_ids = image_tracker.get_and_clear()
             if retrieved_ids:
-                images_markdown = self._get_images_markdown(
-                    retrieved_ids, 
-                    selected_ids=selected_image_ids
-                )
+                images_markdown = self._get_relevant_images(message, retrieved_ids)
                 if images_markdown:
                     response_text += images_markdown
             
@@ -70,42 +62,18 @@ class ChatInterface:
         except Exception as e:
             return f"❌ Error: {str(e)}"
     
-    def _parse_show_images_tag(self, text: str) -> set:
-        """Parse [SHOW_IMAGES: id1, id2, ...] tag from LLM response."""
-        # Match [SHOW_IMAGES: img1, img2, img3]
-        pattern = r'\[SHOW_IMAGES:\s*([^\]]+)\]'
-        match = re.search(pattern, text, re.IGNORECASE)
-        
-        if not match:
-            return set()
-        
-        # Parse comma-separated IDs
-        ids_str = match.group(1)
-        ids = set()
-        for id_part in ids_str.split(','):
-            clean_id = id_part.strip().strip('"\'')
-            if clean_id:
-                ids.add(clean_id)
-        
-        print(f"🎯 LLM selected images: {ids}")
-        return ids
-    
-    def _remove_show_images_tag(self, text: str) -> str:
-        """Remove [SHOW_IMAGES: ...] tag from response text."""
-        pattern = r'\s*\[SHOW_IMAGES:[^\]]+\]\s*'
-        return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
-    
-    def _get_images_markdown(self, parent_ids: set, selected_ids: set = None) -> str:
-        """Fetch images for parent IDs and format as markdown.
+    def _get_relevant_images(self, query: str, parent_ids: set) -> str:
+        """
+        Get relevant images using CLIP semantic scoring.
         
         Args:
-            parent_ids: All parent IDs that were retrieved
-            selected_ids: Specific image IDs selected by LLM (if None, return nothing)
+            query: User query for relevance matching
+            parent_ids: Parent IDs to fetch images from
+            
+        Returns:
+            Markdown string with relevant images, or empty string
         """
-        # If LLM didn't select any images, don't show any
-        if selected_ids is not None and not selected_ids:
-            return ""
-        
+        # Collect all images from retrieved parents
         all_images = []
         
         for parent_id in parent_ids:
@@ -115,46 +83,57 @@ class ChatInterface:
             
             ocr_images = parent_data.get("metadata", {}).get("ocr_images", [])
             for img in ocr_images:
-                img_id = img.get("image_id", "")
-                
-                # Only include images selected by LLM
-                if selected_ids and img_id not in selected_ids:
-                    continue
-                
-                base64_data = img.get("base64_data", "")
-                if not base64_data:
-                    continue
-                
-                mime_type = img.get("mime_type", "image/png")
-                
-                # Build data URL
-                if base64_data.startswith("data:"):
-                    data_url = base64_data
-                else:
-                    data_url = f"data:{mime_type};base64,{base64_data}"
-                
-                caption = img.get("caption", "") or img.get("description", "")
-                page_num = img.get("page_number")
-                
-                all_images.append({
-                    "image_id": img_id,
-                    "data_url": data_url,
-                    "caption": caption,
-                    "page_number": page_num
-                })
+                # Only include images with base64 data
+                if img.get("base64_data"):
+                    img_copy = img.copy()
+                    img_copy["parent_id"] = parent_id
+                    all_images.append(img_copy)
         
         if not all_images:
+            print("   📷 No images found in retrieved chunks")
             return ""
         
+        print(f"   📷 Scoring {len(all_images)} images with CLIP...")
+        
+        # Score images with CLIP
+        relevant_images = score_images_for_query(query, all_images)
+        
+        if not relevant_images:
+            print("   📷 No images passed relevance threshold")
+            return ""
+        
+        print(f"   ✓ Found {len(relevant_images)} relevant images")
+        
         # Format as markdown
+        return self._format_images_markdown(relevant_images)
+    
+    def _format_images_markdown(self, images: list) -> str:
+        """Format scored images as markdown."""
         markdown = "\n\n---\n\n**📸 Related Images:**\n\n"
-        for img in all_images[:5]:  # Limit to 5 images
-            if img["caption"]:
-                markdown += f"*{img['caption']}*\n\n"
-            elif img["page_number"]:
-                markdown += f"*(Page {img['page_number']})*\n\n"
+        
+        for img in images:
+            base64_data = img.get("base64_data", "")
+            mime_type = img.get("mime_type", "image/png")
             
-            markdown += f"![Image]({img['data_url']})\n\n"
+            # Build data URL
+            if base64_data.startswith("data:"):
+                data_url = base64_data
+            else:
+                data_url = f"data:{mime_type};base64,{base64_data}"
+            
+            # Add caption with relevance score
+            caption = img.get("caption", "") or img.get("description", "")
+            score = img.get("relevance_score", 0)
+            page_num = img.get("page_number")
+            
+            if caption:
+                markdown += f"*{caption}* (relevance: {score:.0%})\n\n"
+            elif page_num:
+                markdown += f"*(Page {page_num})* (relevance: {score:.0%})\n\n"
+            else:
+                markdown += f"*(relevance: {score:.0%})*\n\n"
+            
+            markdown += f"![Image]({data_url})\n\n"
         
         return markdown
     

@@ -43,3 +43,12 @@ ENABLE_DOCLING = True
 DOCLING_OCR_ENABLED = True
 DOCLING_IMAGE_SCALE = 2.0
 DOCLING_GENERATE_CAPTIONS = False
+
+# --- CLIP Image Scoring Configuration ---
+# Phase 1: Using Docling captions only (VLM disabled for simplicity and cost)
+ENABLE_VLM_CAPTIONS = False           # Enable VLM-enhanced captions (Phase 2)
+CLIP_MODEL_NAME = "ViT-B-32"          # Small, fast, reliable (150MB model)
+CLIP_DEVICE = "cpu"                    # CPU-only for predictable RAM usage
+MAX_IMAGES_TO_SCORE = 10               # Limit batch size for stability
+IMAGE_SIMILARITY_THRESHOLD = 0.25      # Minimum relevance score (0-1)
+MAX_IMAGES_PER_RESPONSE = 3            # Top-K images to display in response

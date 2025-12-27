@@ -48,7 +48,7 @@ class ToolFactory:
             parent_ids: List of parent chunk IDs to retrieve
             
         Returns:
-            List of parent chunk dicts with content and image references (NOT base64 data)
+            List of parent chunk dicts with content (image selection handled by CLIP separately)
         """
         results = self.parent_store_manager.load_many(parent_ids)
         
@@ -57,32 +57,15 @@ class ToolFactory:
             image_tracker.track(parent_id)
             print(f"📷 Tracked parent_id for images: {parent_id}")
         
-        # Process results - DON'T include base64 data in LLM context!
+        # Process results - return clean content without image references
+        # Image selection is now handled by CLIP scoring, not the LLM
         processed_results = []
         for result in results:
-            # Get image metadata WITHOUT base64 data (just IDs and descriptions)
-            ocr_images = result.get("metadata", {}).get("ocr_images", [])
-            
-            # Build a clean result without huge base64 strings
             clean_result = {
                 "content": result.get("content", ""),
                 "parent_id": result.get("parent_id", ""),
                 "source": result.get("metadata", {}).get("source", ""),
             }
-            
-            # Add image references in a format the LLM can use to select relevant ones
-            if ocr_images:
-                image_refs = "\n\n--- Available Images ---\n"
-                for img in ocr_images:
-                    img_id = img.get("image_id", "")
-                    caption = img.get("caption", "") or img.get("description", "")
-                    page = img.get("page_number", "?")
-                    
-                    # Format: [IMAGE: id="...", caption="...", page=X]
-                    image_refs += f'[IMAGE: id="{img_id}", caption="{caption}", page={page}]\n'
-                
-                clean_result["content"] += image_refs
-            
             processed_results.append(clean_result)
         
         return processed_results

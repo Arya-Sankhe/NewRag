@@ -1,3 +1,4 @@
+import re
 from langchain_core.messages import HumanMessage
 from db.parent_store_manager import ParentStoreManager
 
@@ -48,10 +49,19 @@ class ChatInterface:
             # Get LLM response
             response_text = result["messages"][-1].content
             
-            # Get images for retrieved parent IDs and append to response
+            # Parse [SHOW_IMAGES: id1, id2] tag from response
+            selected_image_ids = self._parse_show_images_tag(response_text)
+            
+            # Remove the tag from visible response
+            response_text = self._remove_show_images_tag(response_text)
+            
+            # Get images for selected IDs only (or all if no tag found)
             retrieved_ids = image_tracker.get_and_clear()
             if retrieved_ids:
-                images_markdown = self._get_images_markdown(retrieved_ids)
+                images_markdown = self._get_images_markdown(
+                    retrieved_ids, 
+                    selected_ids=selected_image_ids
+                )
                 if images_markdown:
                     response_text += images_markdown
             
@@ -60,8 +70,42 @@ class ChatInterface:
         except Exception as e:
             return f"❌ Error: {str(e)}"
     
-    def _get_images_markdown(self, parent_ids: set) -> str:
-        """Fetch images for parent IDs and format as markdown."""
+    def _parse_show_images_tag(self, text: str) -> set:
+        """Parse [SHOW_IMAGES: id1, id2, ...] tag from LLM response."""
+        # Match [SHOW_IMAGES: img1, img2, img3]
+        pattern = r'\[SHOW_IMAGES:\s*([^\]]+)\]'
+        match = re.search(pattern, text, re.IGNORECASE)
+        
+        if not match:
+            return set()
+        
+        # Parse comma-separated IDs
+        ids_str = match.group(1)
+        ids = set()
+        for id_part in ids_str.split(','):
+            clean_id = id_part.strip().strip('"\'')
+            if clean_id:
+                ids.add(clean_id)
+        
+        print(f"🎯 LLM selected images: {ids}")
+        return ids
+    
+    def _remove_show_images_tag(self, text: str) -> str:
+        """Remove [SHOW_IMAGES: ...] tag from response text."""
+        pattern = r'\s*\[SHOW_IMAGES:[^\]]+\]\s*'
+        return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
+    
+    def _get_images_markdown(self, parent_ids: set, selected_ids: set = None) -> str:
+        """Fetch images for parent IDs and format as markdown.
+        
+        Args:
+            parent_ids: All parent IDs that were retrieved
+            selected_ids: Specific image IDs selected by LLM (if None, return nothing)
+        """
+        # If LLM didn't select any images, don't show any
+        if selected_ids is not None and not selected_ids:
+            return ""
+        
         all_images = []
         
         for parent_id in parent_ids:
@@ -71,6 +115,12 @@ class ChatInterface:
             
             ocr_images = parent_data.get("metadata", {}).get("ocr_images", [])
             for img in ocr_images:
+                img_id = img.get("image_id", "")
+                
+                # Only include images selected by LLM
+                if selected_ids and img_id not in selected_ids:
+                    continue
+                
                 base64_data = img.get("base64_data", "")
                 if not base64_data:
                     continue
@@ -87,6 +137,7 @@ class ChatInterface:
                 page_num = img.get("page_number")
                 
                 all_images.append({
+                    "image_id": img_id,
                     "data_url": data_url,
                     "caption": caption,
                     "page_number": page_num
@@ -97,7 +148,7 @@ class ChatInterface:
         
         # Format as markdown
         markdown = "\n\n---\n\n**📸 Related Images:**\n\n"
-        for img in all_images[:5]:  # Limit to 5 images to avoid overwhelming UI
+        for img in all_images[:5]:  # Limit to 5 images
             if img["caption"]:
                 markdown += f"*{img['caption']}*\n\n"
             elif img["page_number"]:

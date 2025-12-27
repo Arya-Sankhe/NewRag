@@ -65,11 +65,13 @@ def get_rag_agent_prompt() -> str:
         5. Answer using ONLY retrieved information.
         6. List file name at the end.
         
-        Image handling:
-        - Retrieved content may include images with captions and descriptions.
-        - If images are relevant to the answer, mention them naturally.
-        - Reference images by their captions or page numbers when available.
-        - Images will be automatically displayed to the user.
+        IMAGE SELECTION (IMPORTANT):
+        - Retrieved content may include image references like: [IMAGE: id="doc_img_3", caption="OEE Dashboard", page=5]
+        - Evaluate which images are DIRECTLY RELEVANT to answering the user's question.
+        - At the END of your response, if any images are relevant, include this exact tag:
+          [SHOW_IMAGES: image_id_1, image_id_2]
+        - Only include image IDs that are truly helpful. Do NOT include all images.
+        - If no images are relevant, do NOT include the SHOW_IMAGES tag.
 
         Retry rule:
         - If no relevant information is found, rewrite the query into a concise,

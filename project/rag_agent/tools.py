@@ -60,17 +60,8 @@ class ToolFactory:
         # Process results - DON'T include base64 data in LLM context!
         processed_results = []
         for result in results:
-            # Get image metadata WITHOUT base64 data (just captions/references)
+            # Get image metadata WITHOUT base64 data (just IDs and descriptions)
             ocr_images = result.get("metadata", {}).get("ocr_images", [])
-            image_refs = []
-            if ocr_images:
-                for img in ocr_images:
-                    # Only include text descriptions, NOT base64 data
-                    image_refs.append({
-                        "image_id": img.get("image_id", ""),
-                        "caption": img.get("caption", "") or img.get("description", ""),
-                        "page_number": img.get("page_number")
-                    })
             
             # Build a clean result without huge base64 strings
             clean_result = {
@@ -79,16 +70,18 @@ class ToolFactory:
                 "source": result.get("metadata", {}).get("source", ""),
             }
             
-            # Add image references as text (for LLM context)
-            if image_refs:
-                image_summary = f"\n[This section contains {len(image_refs)} image(s):"
-                for ref in image_refs:
-                    if ref.get("caption"):
-                        image_summary += f" '{ref['caption']}'"
-                    elif ref.get("page_number"):
-                        image_summary += f" (page {ref['page_number']})"
-                image_summary += "]"
-                clean_result["content"] += image_summary
+            # Add image references in a format the LLM can use to select relevant ones
+            if ocr_images:
+                image_refs = "\n\n--- Available Images ---\n"
+                for img in ocr_images:
+                    img_id = img.get("image_id", "")
+                    caption = img.get("caption", "") or img.get("description", "")
+                    page = img.get("page_number", "?")
+                    
+                    # Format: [IMAGE: id="...", caption="...", page=X]
+                    image_refs += f'[IMAGE: id="{img_id}", caption="{caption}", page={page}]\n'
+                
+                clean_result["content"] += image_refs
             
             processed_results.append(clean_result)
         

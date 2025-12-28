@@ -27,6 +27,10 @@ ENV PYTHONPATH=/app/project:/app/backend
 # Expose port
 EXPOSE 8000
 
-# Run FastAPI
-CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Working directory for running the app
+WORKDIR /app/backend
+
+# Run FastAPI - use python directly to run main.py
+CMD ["python", "main.py"]
+
 

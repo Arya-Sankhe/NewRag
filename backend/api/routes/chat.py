@@ -9,62 +9,54 @@ Provides endpoints for:
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from typing import Optional
-import os
-import sys
-import json
 import asyncio
 import uuid
 
-# Add project directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'project'))
-
+from api.shared import get_rag_system, create_chat_interface
 from api.models.requests import ChatMessageRequest, ClearSessionRequest
-from api.models.responses import ChatMessageResponse, ClearResponse, ChatStreamToken
-from core.rag_system import RAGSystem
-from core.chat_interface import ChatInterface
+from api.models.responses import ChatMessageResponse, ClearResponse
 
 router = APIRouter()
 
-# Store active RAG systems per session
-_sessions: dict[str, tuple[RAGSystem, ChatInterface]] = {}
+# Store chat interfaces per session (lightweight - shares RAG system)
+_chat_sessions: dict[str, object] = {}
 
 
-def get_or_create_session(thread_id: Optional[str] = None) -> tuple[str, RAGSystem, ChatInterface]:
+def get_or_create_chat_session(thread_id: Optional[str] = None):
     """
     Get or create a chat session.
     
-    Args:
-        thread_id: Optional existing thread ID
-        
-    Returns:
-        Tuple of (thread_id, rag_system, chat_interface)
+    Each session gets its own ChatInterface but shares the RAG system.
     """
-    global _sessions
+    global _chat_sessions
     
-    if thread_id and thread_id in _sessions:
-        rag_system, chat_interface = _sessions[thread_id]
-        return thread_id, rag_system, chat_interface
+    if thread_id and thread_id in _chat_sessions:
+        return thread_id, _chat_sessions[thread_id]
     
-    # Create new session
+    # Create new session with shared RAG system
     new_thread_id = thread_id or str(uuid.uuid4())
-    rag_system = RAGSystem()
-    rag_system.initialize()
-    rag_system.thread_id = new_thread_id
-    chat_interface = ChatInterface(rag_system)
     
-    _sessions[new_thread_id] = (rag_system, chat_interface)
+    # Get shared RAG system and create new chat interface
+    rag_system = get_rag_system()
+    chat_interface = create_chat_interface()
     
-    return new_thread_id, rag_system, chat_interface
+    # Set thread ID on the shared RAG system for this session
+    # Note: This is a simplification - for true multi-session, 
+    # we'd need separate thread management
+    
+    _chat_sessions[new_thread_id] = chat_interface
+    
+    return new_thread_id, chat_interface
 
 
-def clear_session(thread_id: str) -> bool:
-    """Clear a specific session."""
-    global _sessions
+def clear_chat_session(thread_id: str) -> bool:
+    """Clear a specific chat session."""
+    global _chat_sessions
     
-    if thread_id in _sessions:
-        rag_system, chat_interface = _sessions[thread_id]
+    if thread_id in _chat_sessions:
+        chat_interface = _chat_sessions[thread_id]
         chat_interface.clear_session()
-        del _sessions[thread_id]
+        del _chat_sessions[thread_id]
         return True
     return False
 
@@ -77,19 +69,13 @@ async def websocket_chat(websocket: WebSocket):
     Protocol:
     1. Connect with optional query param: ?thread_id=xxx
     2. Send JSON messages: {"message": "user query"}
-    3. Receive JSON tokens: {"type": "token|done|error|images", "content": "..."}
-    
-    Token types:
-    - "token": Partial response token
-    - "done": Response complete
-    - "error": Error occurred
-    - "images": Image data (sent after "done")
+    3. Receive JSON tokens: {"type": "token|done|error", "content": "..."}
     """
     await websocket.accept()
     
     # Get thread_id from query params or create new
     thread_id = websocket.query_params.get("thread_id")
-    thread_id, rag_system, chat_interface = get_or_create_session(thread_id)
+    thread_id, chat_interface = get_or_create_chat_session(thread_id)
     
     # Send session info
     await websocket.send_json({
@@ -112,8 +98,8 @@ async def websocket_chat(websocket: WebSocket):
             
             # Check for special commands
             if message == "__clear__":
-                clear_session(thread_id)
-                thread_id, rag_system, chat_interface = get_or_create_session()
+                clear_chat_session(thread_id)
+                thread_id, chat_interface = get_or_create_chat_session()
                 await websocket.send_json({
                     "type": "session",
                     "thread_id": thread_id
@@ -125,14 +111,12 @@ async def websocket_chat(websocket: WebSocket):
                 continue
             
             try:
-                # Process chat message
-                # Note: Current implementation is synchronous
-                # For true streaming, we'd need to modify ChatInterface
-                # to yield tokens. For now, we send the full response.
-                response = chat_interface.chat(message, [])
+                # Process chat message in thread pool (blocking operation)
+                response = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: chat_interface.chat(message, [])
+                )
                 
-                # Send response (as single message for now)
-                # TODO: Implement true token streaming with LangGraph callbacks
                 await websocket.send_json({
                     "type": "token",
                     "content": response
@@ -164,19 +148,17 @@ async def send_message(request: ChatMessageRequest):
     """
     Send a chat message and receive a response (synchronous).
     
-    This is a fallback endpoint for testing or clients that don't support WebSocket.
-    For real-time streaming, use the WebSocket endpoint at /api/v1/chat/stream.
+    Fallback for clients that don't support WebSocket.
     """
     try:
-        thread_id, rag_system, chat_interface = get_or_create_session(request.thread_id)
+        thread_id, chat_interface = get_or_create_chat_session(request.thread_id)
         
-        # Run synchronous chat in thread pool to not block
+        # Run synchronous chat in thread pool
         response = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: chat_interface.chat(request.message, [])
         )
         
-        # Check if response contains images
         has_images = "📸 Related Images:" in response
         
         return ChatMessageResponse(
@@ -190,32 +172,18 @@ async def send_message(request: ChatMessageRequest):
 
 
 @router.post("/clear", response_model=ClearResponse)
-async def clear_chat_session(request: ClearSessionRequest):
-    """
-    Clear a chat session.
+async def clear_session_endpoint(request: ClearSessionRequest):
+    """Clear a chat session."""
+    success = clear_chat_session(request.thread_id)
     
-    This resets the conversation history and starts a fresh session.
-    """
-    success = clear_session(request.thread_id)
-    
-    if success:
-        return ClearResponse(
-            success=True,
-            message=f"Session {request.thread_id} cleared"
-        )
-    else:
-        return ClearResponse(
-            success=False,
-            message=f"Session {request.thread_id} not found"
-        )
+    return ClearResponse(
+        success=success,
+        message=f"Session {request.thread_id} {'cleared' if success else 'not found'}"
+    )
 
 
 @router.get("/session")
 async def create_new_session():
-    """
-    Create a new chat session and return the thread ID.
-    
-    Use this to get a fresh session before connecting via WebSocket.
-    """
-    thread_id, _, _ = get_or_create_session()
+    """Create a new chat session and return the thread ID."""
+    thread_id, _ = get_or_create_chat_session()
     return {"thread_id": thread_id}

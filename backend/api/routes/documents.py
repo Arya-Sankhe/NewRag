@@ -10,46 +10,19 @@ Provides endpoints for:
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import List
 import os
-import sys
 import tempfile
 import shutil
 from pathlib import Path
 
-# Add project directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'project'))
-
+from api.shared import get_document_manager
 from api.models.responses import (
     DocumentListResponse, 
     DocumentInfo, 
     UploadResultResponse,
     ClearResponse,
-    ErrorResponse
 )
-from core.rag_system import RAGSystem
-from core.document_manager import DocumentManager
 
 router = APIRouter()
-
-# Global RAG system instance (initialized once)
-_rag_system = None
-_doc_manager = None
-
-
-def get_rag_system() -> RAGSystem:
-    """Get or initialize the RAG system singleton."""
-    global _rag_system
-    if _rag_system is None:
-        _rag_system = RAGSystem()
-        _rag_system.initialize()
-    return _rag_system
-
-
-def get_document_manager() -> DocumentManager:
-    """Get or initialize the document manager singleton."""
-    global _doc_manager
-    if _doc_manager is None:
-        _doc_manager = DocumentManager(get_rag_system())
-    return _doc_manager
 
 
 @router.get("", response_model=DocumentListResponse)

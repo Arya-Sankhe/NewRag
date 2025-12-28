@@ -16,6 +16,7 @@ services:
       - qdrant_data:/app/project/qdrant_db
       - parent_store:/app/project/parent_store
       - markdown_docs:/app/project/markdown_docs
+      - images_data:/app/project/images
     environment:
       - PYTHONUNBUFFERED=1
       - FASTAPI_HOST=0.0.0.0
@@ -52,4 +53,5 @@ volumes:
   qdrant_data:
   parent_store:
   markdown_docs:
+  images_data:
 

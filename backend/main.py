@@ -25,7 +25,7 @@ else:
         sys.path.insert(0, _current_dir)
 
 # Now import routes - they will use the paths we just set up
-from api.routes import chat, documents
+from api.routes import chat, documents, images
 
 app = FastAPI(
     title="RAG System API",
@@ -47,6 +47,7 @@ app.add_middleware(
 # Include API routes
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
+app.include_router(images.router, prefix="/api/v1/images", tags=["Images"])
 
 
 @app.on_event("startup")

@@ -71,7 +71,7 @@ class ChatInterface:
             parent_ids: Parent IDs to fetch images from
             
         Returns:
-            Markdown string with relevant images, or empty string
+            HTML string with relevant images, or empty string
         """
         # Collect all images from retrieved parents
         all_images = []
@@ -85,12 +85,8 @@ class ChatInterface:
             print(f"   📷 Parent {parent_id}: found {len(ocr_images)} images in metadata")
             
             for img in ocr_images:
-                base64_data = img.get("base64_data", "")
-                has_data = bool(base64_data) and len(base64_data) > 100
-                print(f"      Image {img.get('image_id', 'unknown')}: base64_data present={has_data}, length={len(base64_data) if base64_data else 0}")
-                
-                # Only include images with base64 data
-                if base64_data:
+                # Support both file-based (image_path) and legacy (base64_data)
+                if img.get("image_path") or img.get("base64_data"):
                     img_copy = img.copy()
                     img_copy["parent_id"] = parent_id
                     all_images.append(img_copy)
@@ -108,39 +104,38 @@ class ChatInterface:
             print("   📷 No images passed relevance threshold")
             return ""
         
-        # Debug: Check what we got back from scorer
         print(f"   ✓ Found {len(relevant_images)} relevant images")
-        for img in relevant_images:
-            b64 = img.get("base64_data", "")
-            print(f"      Scored image {img.get('image_id', 'unknown')}: base64_data length={len(b64) if b64 else 0}")
         
-        # Format as markdown
-        return self._format_images_markdown(relevant_images)
+        # Format as HTML
+        return self._format_images_html(relevant_images)
     
-    def _format_images_markdown(self, images: list) -> str:
-        """Format scored images as HTML (markdown parsers can't handle large data URLs)."""
+    def _format_images_html(self, images: list) -> str:
+        """Format scored images as HTML with API URLs."""
         
-        # Use HTML format because markdown syntax breaks with 50KB+ data URLs
         html = "\n\n---\n\n**📸 Related Images:**\n\n"
         images_added = 0
         
         for img in images:
+            # Determine image source
+            image_path = img.get("image_path", "")
             base64_data = img.get("base64_data", "")
             mime_type = img.get("mime_type", "image/png")
             
-            # Debug log
-            print(f"   📸 Formatting image: base64_data length={len(base64_data) if base64_data else 0}")
-            
-            # Skip if no base64 data
-            if not base64_data:
-                print(f"   ⚠️ Skipping image with empty base64_data: {img.get('image_id', 'unknown')}")
-                continue
-            
-            # Build data URL
-            if base64_data.startswith("data:"):
-                data_url = base64_data
+            # Prefer file path (new system), fallback to base64 (legacy)
+            if image_path:
+                # Use API URL - strip "images/" prefix if present
+                if image_path.startswith("images/"):
+                    image_path = image_path[7:]  # Remove "images/"
+                img_url = f"/api/v1/images/{image_path}"
+            elif base64_data:
+                # Legacy base64 fallback
+                if base64_data.startswith("data:"):
+                    img_url = base64_data
+                else:
+                    img_url = f"data:{mime_type};base64,{base64_data}"
             else:
-                data_url = f"data:{mime_type};base64,{base64_data}"
+                print(f"   ⚠️ Skipping image with no path or data: {img.get('image_id', 'unknown')}")
+                continue
             
             # Caption and score
             caption = img.get("caption", "") or img.get("vlm_caption", "") or img.get("description", "")
@@ -155,14 +150,14 @@ class ChatInterface:
             else:
                 caption_text = f"({score:.0%})"
             
-            # Use HTML img tag - markdown syntax can't handle 50KB+ data URLs
+            # Use HTML img tag
             html += f"{caption_text}\n\n"
-            html += f'<img src="{data_url}" alt="Related image" style="max-width: 100%; max-height: 400px; border-radius: 8px; margin: 8px 0;" />\n\n'
+            html += f'<img src="{img_url}" alt="Related image" style="max-width: 100%; max-height: 400px; border-radius: 8px; margin: 8px 0;" />\n\n'
             images_added += 1
         
         # Return empty if no valid images
         if images_added == 0:
-            print("   ⚠️ No images had valid base64 data")
+            print("   ⚠️ No images had valid path or data")
             return ""
         
         print(f"   ✓ Added {images_added} images to response")

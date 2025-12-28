@@ -8,6 +8,7 @@ load_dotenv()
 MARKDOWN_DIR = "markdown_docs"
 PARENT_STORE_PATH = "parent_store"
 QDRANT_DB_PATH = "qdrant_db"
+IMAGES_DIR = "images"  # Directory to store extracted images
 
 # --- Qdrant Configuration ---
 CHILD_COLLECTION = "document_child_chunks"

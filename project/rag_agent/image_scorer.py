@@ -131,21 +131,32 @@ class ImageRelevanceScorer:
         Uses weighted combination of:
         - Visual similarity (image embedding vs query embedding)
         - Text similarity (caption embedding vs query embedding)
+        
+        Supports both file-based images (image_path) and legacy base64_data.
         """
         import torch
         
         visual_score = 0.0
         text_score = 0.0
         
-        # Get visual embedding from image data
+        # Get visual embedding from image (prefer file path, fallback to base64)
+        image_path = img_metadata.get('image_path', '')
         base64_data = img_metadata.get('base64_data', '')
-        if base64_data:
-            img_embedding = self._get_image_embedding(
+        
+        if image_path:
+            # New file-based approach
+            img_embedding = self._get_image_embedding_from_path(image_path)
+            if img_embedding is not None:
+                visual_score = torch.nn.functional.cosine_similarity(
+                    query_embedding, img_embedding, dim=-1
+                ).item()
+        elif base64_data:
+            # Legacy base64 approach
+            img_embedding = self._get_image_embedding_from_base64(
                 base64_data, 
                 img_metadata.get('mime_type', 'image/png')
             )
             if img_embedding is not None:
-                # Cosine similarity
                 visual_score = torch.nn.functional.cosine_similarity(
                     query_embedding, img_embedding, dim=-1
                 ).item()
@@ -170,8 +181,40 @@ class ImageRelevanceScorer:
         else:
             return None
     
-    def _get_image_embedding(self, base64_data: str, mime_type: str):
-        """Convert base64 image to CLIP embedding."""
+    def _get_image_embedding_from_path(self, image_path: str):
+        """Load image from file path and get CLIP embedding."""
+        import torch
+        from pathlib import Path
+        
+        try:
+            # Build full path (handle both relative and absolute)
+            if image_path.startswith('/'):
+                full_path = Path(image_path)
+            else:
+                # Relative path - prepend project root
+                full_path = Path('/app/project') / image_path
+            
+            if not full_path.exists():
+                print(f"   ⚠️ Image not found: {full_path}")
+                return None
+            
+            image = Image.open(full_path).convert('RGB')
+            
+            # Preprocess and get embedding
+            image_tensor = self._preprocess(image).unsqueeze(0).to(config.CLIP_DEVICE)
+            
+            with torch.no_grad():
+                image_features = self._model.encode_image(image_tensor)
+                image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+            
+            return image_features
+            
+        except Exception as e:
+            print(f"   ⚠️ Failed to get image embedding from path: {e}")
+            return None
+    
+    def _get_image_embedding_from_base64(self, base64_data: str, mime_type: str):
+        """Convert base64 image to CLIP embedding (legacy support)."""
         import torch
         
         try:
@@ -194,7 +237,7 @@ class ImageRelevanceScorer:
             return image_features
             
         except Exception as e:
-            print(f"   ⚠️ Failed to get image embedding: {e}")
+            print(f"   ⚠️ Failed to get image embedding from base64: {e}")
             return None
     
     def _get_text_embedding(self, text: str):

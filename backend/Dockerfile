@@ -5,10 +5,17 @@ ENV PYTHONPATH=/app/project:/app/backend
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including libGL for OpenCV/Docling
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy ALL requirements first for caching

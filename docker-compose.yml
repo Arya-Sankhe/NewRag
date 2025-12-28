@@ -4,8 +4,8 @@ services:
   # FastAPI Backend
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .                    # Changed from ./backend to .
+      dockerfile: backend/Dockerfile  # Added path to Dockerfile
     ports:
       - "8000:8000"
     volumes:
@@ -32,8 +32,8 @@ services:
   # Next.js Frontend
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .                      # Changed from ./frontend to .
+      dockerfile: frontend/Dockerfile   # Added path to Dockerfile
     ports:
       - "3000:3000"
     volumes:
@@ -51,3 +51,4 @@ volumes:
   qdrant_data:
   parent_store:
   markdown_docs:
+

@@ -1,8 +1,5 @@
 # FastAPI Backend Requirements
-# Extends the base project requirements with API-specific dependencies
-
-# Include all project dependencies
--r ../project/requirements.txt
+# Note: Project base requirements are installed separately in Docker
 
 # --- FastAPI and ASGI ---
 fastapi[all]>=0.115.0

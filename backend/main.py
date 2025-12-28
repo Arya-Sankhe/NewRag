@@ -7,14 +7,24 @@ import os
 import sys
 
 # Fix Python path for both local and Docker environments
-if os.path.exists('/app/project'):
-    sys.path.insert(0, '/app/project')
-    sys.path.insert(0, '/app/backend')
-else:
-    _current_dir = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(_current_dir, '..', 'project'))
-    sys.path.insert(0, _current_dir)
+# PYTHONPATH is set in Dockerfile, but also set here for local development
+_current_dir = os.path.dirname(os.path.abspath(__file__))
 
+if os.path.exists('/app/project'):
+    # Docker environment - PYTHONPATH already set, but ensure it's in sys.path
+    if '/app/project' not in sys.path:
+        sys.path.insert(0, '/app/project')
+    if '/app/backend' not in sys.path:
+        sys.path.insert(0, '/app/backend')
+else:
+    # Local development
+    project_path = os.path.abspath(os.path.join(_current_dir, '..', 'project'))
+    if project_path not in sys.path:
+        sys.path.insert(0, project_path)
+    if _current_dir not in sys.path:
+        sys.path.insert(0, _current_dir)
+
+# Now import routes - they will use the paths we just set up
 from api.routes import chat, documents
 
 app = FastAPI(
@@ -28,12 +38,7 @@ app = FastAPI(
 # CORS configuration for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://frontend:3000",
-        os.getenv("FRONTEND_URL", "http://localhost:3000")
-    ],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,9 +52,8 @@ app.include_router(documents.router, prefix="/api/v1/documents", tags=["Document
 @app.on_event("startup")
 async def startup_event():
     """Initialize shared resources on startup."""
-    print("🚀 Starting RAG System API...")
-    # Lazy initialization - models loaded on first request
-    # This keeps startup fast while sharing the singleton
+    print("🚀 RAG System API started successfully!")
+    print("📚 API Documentation: http://localhost:8000/docs")
 
 
 @app.get("/health", tags=["Health"])

@@ -53,6 +53,10 @@ export function ChatInterface() {
 
         try {
             const response = await sendChatMessage(userMessage.content, threadId || undefined);
+            console.log('API Response:', response);
+            console.log('Response content length:', response.response?.length);
+            console.log('Contains image markdown:', response.response?.includes('![Image]'));
+
             setThreadId(response.thread_id);
             setMessages(prev => [
                 ...prev,
@@ -131,14 +135,29 @@ export function ChatInterface() {
                                             remarkPlugins={[remarkGfm]}
                                             components={{
                                                 // eslint-disable-next-line @next/next/no-img-element
-                                                img: ({ src, alt }) => (
-                                                    <img
-                                                        src={src}
-                                                        alt={alt || 'Image'}
-                                                        className="max-w-full h-auto rounded-md my-2"
-                                                        style={{ maxHeight: '400px' }}
-                                                    />
-                                                ),
+                                                img: ({ src, alt }) => {
+                                                    // Debug logging
+                                                    console.log('Image component received src:', src ? `${src.substring(0, 100)}...` : 'EMPTY');
+                                                    console.log('Image src length:', src?.length || 0);
+
+                                                    // Don't render if no src
+                                                    if (!src) {
+                                                        console.warn('Empty image src detected');
+                                                        return <span className="text-red-500">[Image failed to load]</span>;
+                                                    }
+
+                                                    return (
+                                                        <img
+                                                            src={src}
+                                                            alt={alt || 'Image'}
+                                                            className="max-w-full h-auto rounded-md my-2"
+                                                            style={{ maxHeight: '400px' }}
+                                                            onError={(e) => {
+                                                                console.error('Image failed to load, src:', src.substring(0, 100));
+                                                            }}
+                                                        />
+                                                    );
+                                                },
                                                 p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                                                 code: ({ children }) => (
                                                     <code className="bg-background/50 px-1 py-0.5 rounded text-sm">

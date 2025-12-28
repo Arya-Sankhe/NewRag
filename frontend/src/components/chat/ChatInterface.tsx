@@ -10,9 +10,17 @@ import { Message } from '@/lib/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+// Simple UUID generator that works in all environments
+function generateId(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 /**
  * Chat interface using HTTP POST requests.
- * WebSocket streaming disabled for VPS compatibility.
  */
 export function ChatInterface() {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -33,7 +41,7 @@ export function ChatInterface() {
         if (!input.trim() || isLoading) return;
 
         const userMessage: Message = {
-            id: crypto.randomUUID(),
+            id: generateId(),
             role: 'user',
             content: input.trim(),
             timestamp: new Date()
@@ -49,7 +57,7 @@ export function ChatInterface() {
             setMessages(prev => [
                 ...prev,
                 {
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     role: 'assistant',
                     content: response.response,
                     timestamp: new Date()
@@ -59,7 +67,7 @@ export function ChatInterface() {
             setMessages(prev => [
                 ...prev,
                 {
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     role: 'assistant',
                     content: `❌ Error: ${error instanceof Error ? error.message : 'Connection failed'}`,
                     timestamp: new Date()

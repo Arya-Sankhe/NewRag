@@ -82,9 +82,15 @@ class ChatInterface:
                 continue
             
             ocr_images = parent_data.get("metadata", {}).get("ocr_images", [])
+            print(f"   📷 Parent {parent_id}: found {len(ocr_images)} images in metadata")
+            
             for img in ocr_images:
+                base64_data = img.get("base64_data", "")
+                has_data = bool(base64_data) and len(base64_data) > 100
+                print(f"      Image {img.get('image_id', 'unknown')}: base64_data present={has_data}, length={len(base64_data) if base64_data else 0}")
+                
                 # Only include images with base64 data
-                if img.get("base64_data"):
+                if base64_data:
                     img_copy = img.copy()
                     img_copy["parent_id"] = parent_id
                     all_images.append(img_copy)
@@ -102,7 +108,11 @@ class ChatInterface:
             print("   📷 No images passed relevance threshold")
             return ""
         
+        # Debug: Check what we got back from scorer
         print(f"   ✓ Found {len(relevant_images)} relevant images")
+        for img in relevant_images:
+            b64 = img.get("base64_data", "")
+            print(f"      Scored image {img.get('image_id', 'unknown')}: base64_data length={len(b64) if b64 else 0}")
         
         # Format as markdown
         return self._format_images_markdown(relevant_images)
@@ -112,10 +122,19 @@ class ChatInterface:
         
         # Use markdown format - Gradio ChatInterface properly renders this
         markdown = "\n\n---\n\n**📸 Related Images:**\n\n"
+        images_added = 0
         
         for img in images:
             base64_data = img.get("base64_data", "")
             mime_type = img.get("mime_type", "image/png")
+            
+            # Debug log
+            print(f"   📸 Formatting image: base64_data length={len(base64_data) if base64_data else 0}")
+            
+            # Skip if no base64 data
+            if not base64_data:
+                print(f"   ⚠️ Skipping image with empty base64_data: {img.get('image_id', 'unknown')}")
+                continue
             
             # Build data URL
             if base64_data.startswith("data:"):
@@ -138,7 +157,14 @@ class ChatInterface:
             
             markdown += f"{caption_text}\n\n"
             markdown += f"![Image]({data_url})\n\n"
+            images_added += 1
         
+        # Return empty if no valid images
+        if images_added == 0:
+            print("   ⚠️ No images had valid base64 data")
+            return ""
+        
+        print(f"   ✓ Added {images_added} images to response")
         return markdown
     
     def clear_session(self):

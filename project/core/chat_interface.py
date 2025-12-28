@@ -118,10 +118,10 @@ class ChatInterface:
         return self._format_images_markdown(relevant_images)
     
     def _format_images_markdown(self, images: list) -> str:
-        """Format scored images as markdown (Gradio ChatInterface renders markdown, not raw HTML)."""
+        """Format scored images as HTML (markdown parsers can't handle large data URLs)."""
         
-        # Use markdown format - Gradio ChatInterface properly renders this
-        markdown = "\n\n---\n\n**📸 Related Images:**\n\n"
+        # Use HTML format because markdown syntax breaks with 50KB+ data URLs
+        html = "\n\n---\n\n**📸 Related Images:**\n\n"
         images_added = 0
         
         for img in images:
@@ -155,8 +155,9 @@ class ChatInterface:
             else:
                 caption_text = f"({score:.0%})"
             
-            markdown += f"{caption_text}\n\n"
-            markdown += f"![Image]({data_url})\n\n"
+            # Use HTML img tag - markdown syntax can't handle 50KB+ data URLs
+            html += f"{caption_text}\n\n"
+            html += f'<img src="{data_url}" alt="Related image" style="max-width: 100%; max-height: 400px; border-radius: 8px; margin: 8px 0;" />\n\n'
             images_added += 1
         
         # Return empty if no valid images
@@ -165,7 +166,7 @@ class ChatInterface:
             return ""
         
         print(f"   ✓ Added {images_added} images to response")
-        return markdown
+        return html
     
     def clear_session(self):
         self.rag_system.reset_thread()

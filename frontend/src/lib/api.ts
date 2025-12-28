@@ -1,14 +1,50 @@
 /**
  * API client for backend communication.
+ * 
+ * Uses window.location to determine the backend URL dynamically,
+ * so it works on localhost, VPS, or any other deployment.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+// Dynamically determine API URL based on current page location
+function getApiUrl(): string {
+    if (typeof window === 'undefined') {
+        // Server-side: use environment variable or default
+        return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    }
+
+    // Client-side: use same host, different port
+    const host = window.location.hostname;
+    const protocol = window.location.protocol;
+
+    // If there's an explicit API URL set, use it
+    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL !== 'http://localhost:8000') {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    // Otherwise, use the same host with port 8000
+    return `${protocol}//${host}:8000`;
+}
+
+function getWsUrl(): string {
+    if (typeof window === 'undefined') {
+        return process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+    }
+
+    const host = window.location.hostname;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+    if (process.env.NEXT_PUBLIC_WS_URL && process.env.NEXT_PUBLIC_WS_URL !== 'ws://localhost:8000') {
+        return process.env.NEXT_PUBLIC_WS_URL;
+    }
+
+    return `${protocol}//${host}:8000`;
+}
 
 /**
  * Fetch documents list from the backend.
  */
 export async function getDocuments(): Promise<DocumentListResponse> {
+    const API_URL = getApiUrl();
     const response = await fetch(`${API_URL}/api/v1/documents`);
     if (!response.ok) {
         throw new Error(`Failed to fetch documents: ${response.statusText}`);
@@ -24,6 +60,7 @@ export async function uploadDocuments(
     enableVlm: boolean = false,
     onProgress?: (progress: number) => void
 ): Promise<UploadResultResponse> {
+    const API_URL = getApiUrl();
     const formData = new FormData();
 
     files.forEach(file => {
@@ -48,6 +85,7 @@ export async function uploadDocuments(
  * Clear all documents from the knowledge base.
  */
 export async function clearDocuments(): Promise<ClearResponse> {
+    const API_URL = getApiUrl();
     const response = await fetch(`${API_URL}/api/v1/documents/clear`, {
         method: 'DELETE',
     });
@@ -66,6 +104,7 @@ export async function sendChatMessage(
     message: string,
     threadId?: string
 ): Promise<ChatMessageResponse> {
+    const API_URL = getApiUrl();
     const response = await fetch(`${API_URL}/api/v1/chat/message`, {
         method: 'POST',
         headers: {
@@ -95,10 +134,12 @@ export function createChatWebSocket(
     onClose?: () => void,
     onError?: (error: Event) => void
 ): WebSocket {
+    const WS_URL = getWsUrl();
     const url = threadId
         ? `${WS_URL}/api/v1/chat/stream?thread_id=${threadId}`
         : `${WS_URL}/api/v1/chat/stream`;
 
+    console.log('Connecting to WebSocket:', url);
     const ws = new WebSocket(url);
 
     ws.onopen = () => {
@@ -132,6 +173,7 @@ export function createChatWebSocket(
  * Get a new session ID.
  */
 export async function createSession(): Promise<{ thread_id: string }> {
+    const API_URL = getApiUrl();
     const response = await fetch(`${API_URL}/api/v1/chat/session`);
     if (!response.ok) {
         throw new Error(`Failed to create session: ${response.statusText}`);

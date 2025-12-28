@@ -42,8 +42,9 @@ services:
       - ./frontend/public:/app/public
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+      # Leave empty to use dynamic URL detection based on window.location
+      - NEXT_PUBLIC_API_URL=
+      - NEXT_PUBLIC_WS_URL=
     depends_on:
       - backend
 

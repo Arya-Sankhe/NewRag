@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount project code for hot reload
+      - ./project:/app/project
+      - ./backend:/app/backend
+      # Persistent data volumes
+      - qdrant_data:/app/project/qdrant_db
+      - parent_store:/app/project/parent_store
+      - markdown_docs:/app/project/markdown_docs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FASTAPI_HOST=0.0.0.0
+      - FASTAPI_PORT=8000
+      - FRONTEND_URL=http://localhost:3000
+    env_file:
+      - ./project/.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source for hot reload (development)
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  qdrant_data:
+  parent_store:
+  markdown_docs:

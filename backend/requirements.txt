@@ -1,0 +1,14 @@
+# FastAPI Backend Requirements
+# Extends the base project requirements with API-specific dependencies
+
+# Include all project dependencies
+-r ../project/requirements.txt
+
+# --- FastAPI and ASGI ---
+fastapi[all]>=0.115.0
+uvicorn[standard]>=0.23.0
+websockets>=12.0
+
+# --- Additional utilities ---
+python-multipart>=0.0.6
+aiofiles>=23.0.0

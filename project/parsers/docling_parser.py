@@ -136,6 +136,11 @@ class DoclingPDFParser:
             try:
                 image_data = self._extract_image_metadata(picture, idx, doc, doc_stem)
                 if image_data:
+                    # Remove internal fields that can't be JSON serialized
+                    # These are only used by convert_and_save() for saving to disk
+                    image_data.pop("_pil_image", None)
+                    image_data.pop("_format", None)
+                    image_data.pop("_ext", None)
                     images_metadata.append(image_data)
             except Exception as e:
                 print(f"   ⚠️ Warning: Could not extract image {idx}: {e}")

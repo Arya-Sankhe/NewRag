@@ -318,9 +318,14 @@ class DoclingPDFParser:
         if not hasattr(doc, 'pictures') or not doc.pictures:
             return images_metadata
         
-        # Create images directory for this document
-        images_dir = Path(config.IMAGES_DIR) / doc_stem
+        # Get project root (where config.py is located)
+        project_root = Path(config.__file__).parent
+        
+        # Create images directory for this document using absolute path
+        images_dir = project_root / config.IMAGES_DIR / doc_stem
         images_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"   📁 Saving images to: {images_dir}")
         
         for idx, picture in enumerate(doc.pictures):
             try:
@@ -347,7 +352,7 @@ class DoclingPDFParser:
                 
                 pil_image.save(image_path, format=img_format, quality=85)
                 
-                # Add image_path to metadata (relative path)
+                # Add image_path to metadata (relative path from project root)
                 img_data["image_path"] = f"{config.IMAGES_DIR}/{doc_stem}/{filename}"
                 
                 images_metadata.append(img_data)

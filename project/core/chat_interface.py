@@ -126,7 +126,14 @@ class ChatInterface:
                 # Use API URL - strip "images/" prefix if present
                 if image_path.startswith("images/"):
                     image_path = image_path[7:]  # Remove "images/"
-                img_url = f"/api/v1/images/{image_path}"
+                
+                # URL encode the path components (handle spaces and special chars)
+                from urllib.parse import quote
+                parts = image_path.split("/")
+                encoded_parts = [quote(p, safe='') for p in parts]
+                encoded_path = "/".join(encoded_parts)
+                
+                img_url = f"/api/v1/images/{encoded_path}"
             elif base64_data:
                 # Legacy base64 fallback
                 if base64_data.startswith("data:"):

@@ -39,18 +39,17 @@ def pdf_to_markdown(pdf_path: str, output_dir: str, enable_vlm: bool = False) ->
                 do_picture_description=config.DOCLING_GENERATE_CAPTIONS
             )
             
-            markdown_text, images_metadata = parser.convert(pdf_path)
-            md_path.write_text(markdown_text, encoding='utf-8')
+            # Use convert_and_save to save images to disk and get image_path in metadata
+            md_path, images_metadata = parser.convert_and_save(pdf_path, str(output_dir))
             
             # Generate VLM captions if enabled
             if enable_vlm and images_metadata:
                 images_metadata = _add_vlm_captions(images_metadata)
-            
-            # Save images metadata as JSON
-            if images_metadata:
-                images_json_path = output_dir / f"{doc_stem}_images.json"
-                with open(images_json_path, 'w', encoding='utf-8') as f:
-                    json.dump(images_metadata, f, ensure_ascii=False, indent=2)
+                # Re-save JSON with VLM captions
+                if images_metadata:
+                    images_json_path = output_dir / f"{doc_stem}_images.json"
+                    with open(images_json_path, 'w', encoding='utf-8') as f:
+                        json.dump(images_metadata, f, ensure_ascii=False, indent=2)
             
             return md_path, images_metadata
             

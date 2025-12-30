@@ -163,12 +163,20 @@ class ImageRelevanceScorer:
         
         # Get text embedding from caption
         caption = img_metadata.get('caption', '') or img_metadata.get('vlm_caption', '') or img_metadata.get('description', '')
+        caption_source = 'caption' if img_metadata.get('caption') else ('vlm_caption' if img_metadata.get('vlm_caption') else ('description' if img_metadata.get('description') else 'none'))
+        
         if caption:
             caption_embedding = self._get_text_embedding(caption)
             if caption_embedding is not None:
                 text_score = torch.nn.functional.cosine_similarity(
                     query_embedding, caption_embedding, dim=-1
                 ).item()
+        
+        # Debug logging
+        img_id = img_metadata.get('image_id', 'unknown')
+        print(f"      📊 {img_id}: visual={visual_score:.3f}, text={text_score:.3f} (source: {caption_source})")
+        if caption:
+            print(f"         Caption: {caption[:60]}...")
         
         # Weighted combination: prioritize visual features
         if visual_score > 0 and text_score > 0:

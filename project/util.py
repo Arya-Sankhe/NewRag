@@ -82,12 +82,17 @@ def _add_vlm_captions(images_metadata: List[Dict]) -> List[Dict]:
     """
     Add VLM-generated captions to images using OpenAI's vision model.
     
+    Supports both file-based images (image_path) and legacy base64_data.
+    
     Args:
-        images_metadata: List of image metadata dicts with base64_data
+        images_metadata: List of image metadata dicts
         
     Returns:
         Updated images_metadata with vlm_caption field
     """
+    import base64
+    from pathlib import Path
+    
     try:
         from langchain_openai import ChatOpenAI
         from langchain_core.messages import HumanMessage
@@ -97,18 +102,41 @@ def _add_vlm_captions(images_metadata: List[Dict]) -> List[Dict]:
         
         print(f"   🧠 Generating VLM captions for {len(images_metadata)} images...")
         
+        # Get project root for resolving relative paths
+        project_root = Path(config.__file__).parent
+        
         for i, img in enumerate(images_metadata):
-            base64_data = img.get("base64_data", "")
-            if not base64_data:
-                continue
-            
+            image_url = None
             mime_type = img.get("mime_type", "image/png")
             
-            # Build data URL
-            if base64_data.startswith("data:"):
-                image_url = base64_data
+            # Try to get image data - prefer file path, fallback to base64
+            image_path = img.get("image_path", "")
+            base64_data = img.get("base64_data", "")
+            
+            if image_path:
+                # Load image from file and convert to base64
+                try:
+                    full_path = project_root / image_path
+                    if full_path.exists():
+                        with open(full_path, 'rb') as f:
+                            image_bytes = f.read()
+                        b64_data = base64.b64encode(image_bytes).decode('utf-8')
+                        image_url = f"data:{mime_type};base64,{b64_data}"
+                    else:
+                        print(f"      ⚠️ Image file not found: {full_path}")
+                        continue
+                except Exception as e:
+                    print(f"      ⚠️ Failed to load image {i+1}: {e}")
+                    continue
+            elif base64_data:
+                # Legacy base64 support
+                if base64_data.startswith("data:"):
+                    image_url = base64_data
+                else:
+                    image_url = f"data:{mime_type};base64,{base64_data}"
             else:
-                image_url = f"data:{mime_type};base64,{base64_data}"
+                print(f"      ⚠️ No image data for image {i+1}")
+                continue
             
             try:
                 # Create vision message

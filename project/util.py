@@ -138,30 +138,50 @@ def _add_vlm_captions(images_metadata: List[Dict]) -> List[Dict]:
                 print(f"      ⚠️ No image data for image {i+1}")
                 continue
             
-            try:
-                # Create vision message
-                message = HumanMessage(
-                    content=[
-                        {
-                            "type": "text",
-                            "text": "Describe this image in 1-2 sentences. Focus on what the image shows (charts, diagrams, photos, etc.) and any key information visible. Be concise."
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": image_url}
-                        }
-                    ]
-                )
-                
-                response = vlm.invoke([message])
-                vlm_caption = response.content.strip()
-                
-                img["vlm_caption"] = vlm_caption
-                print(f"      ✓ Image {i+1}: {vlm_caption[:50]}...")
-                
-            except Exception as e:
-                print(f"      ⚠️ VLM failed for image {i+1}: {e}")
-                img["vlm_caption"] = ""
+            # Retry logic with exponential backoff for rate limits
+            max_retries = 3
+            retry_delay = 0.5  # Start with 500ms
+            
+            for attempt in range(max_retries):
+                try:
+                    # Create vision message
+                    message = HumanMessage(
+                        content=[
+                            {
+                                "type": "text",
+                                "text": "Describe this image in 1-2 sentences. Focus on what the image shows (charts, diagrams, photos, etc.) and any key information visible. Be concise."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url}
+                            }
+                        ]
+                    )
+                    
+                    response = vlm.invoke([message])
+                    vlm_caption = response.content.strip()
+                    
+                    img["vlm_caption"] = vlm_caption
+                    print(f"      ✓ Image {i+1}: {vlm_caption[:50]}...")
+                    
+                    # Add delay between successful calls to avoid rate limits
+                    import time
+                    time.sleep(0.3)  # 300ms between calls
+                    break  # Success, exit retry loop
+                    
+                except Exception as e:
+                    error_str = str(e)
+                    if "429" in error_str or "rate_limit" in error_str.lower():
+                        if attempt < max_retries - 1:
+                            wait_time = retry_delay * (2 ** attempt)  # Exponential backoff
+                            print(f"      ⏳ Rate limited, waiting {wait_time:.1f}s...")
+                            import time
+                            time.sleep(wait_time)
+                            continue
+                    # Non-rate-limit error or final attempt
+                    print(f"      ⚠️ VLM failed for image {i+1}: {e}")
+                    img["vlm_caption"] = ""
+                    break
         
         print(f"   ✓ VLM captions complete")
         return images_metadata
